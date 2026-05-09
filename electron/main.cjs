@@ -49,6 +49,10 @@ if (!isDev) {
     autoUpdater = require('electron-updater').autoUpdater
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: 'https://ghfast.top/https://github.com/yamanacn/OLDXimage2/releases/latest/download',
+    })
 
     autoUpdater.on('update-available', (info) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
