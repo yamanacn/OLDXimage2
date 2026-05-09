@@ -19,7 +19,7 @@ jobs:
           node-version: 20
 
       - name: Set version
-        run: npm version ${{ inputs.version }} --no-git-tag-version
+        run: npm version ${{ inputs.version }} --no-git-tag-version || true
 
       - run: npm ci
 
@@ -45,7 +45,7 @@ jobs:
           node-version: 20
 
       - name: Set version
-        run: npm version ${{ inputs.version }} --no-git-tag-version
+        run: npm version ${{ inputs.version }} --no-git-tag-version || true
 
       - run: npm ci
 
