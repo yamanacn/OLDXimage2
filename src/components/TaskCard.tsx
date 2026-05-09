@@ -6,8 +6,10 @@ import {
   CheckCircle,
   CircleDashed,
   Clock,
-  Download,
+  Copy,
+  FolderOpen,
   MessageSquareText,
+  Plus,
   RotateCcw,
   Sparkles,
   SquarePen,
@@ -17,6 +19,7 @@ import clsx from 'clsx'
 import type { ReferenceImagePayload } from '../imagePayload'
 import { createClientId } from '../clientIds'
 import AddToReferenceButton from './AddToReferenceButton'
+import ContextMenu, { copyImageToClipboard, revealFile, type ContextMenuItem } from './ContextMenu'
 
 const STAGE_LABELS: Record<TaskStage, string> = {
   preparing: '准备任务中',
@@ -67,7 +70,6 @@ function GeneratedImageTile({
   task,
   imageIndex,
   onPreview,
-  onDownload,
   onUseAsReference,
 }: {
   imageUrl: string
@@ -75,70 +77,97 @@ function GeneratedImageTile({
   task: Task
   imageIndex: number
   onPreview: (preview: PreviewImage) => void
-  onDownload: () => void
   onUseAsReference?: () => void
 }) {
   const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'error'>('loading')
 
+  const contextItems: ContextMenuItem[] = [
+    {
+      label: '打开所在文件夹',
+      icon: <FolderOpen size={15} />,
+      onClick: () => void revealFile(imageUrl).catch(() => {}),
+    },
+    {
+      label: '复制图片',
+      icon: <Copy size={15} />,
+      onClick: () => void copyImageToClipboard(imageUrl).catch(() => {}),
+    },
+    {
+      label: '复制提示词',
+      icon: <MessageSquareText size={15} />,
+      onClick: () => void navigator.clipboard.writeText(task.params.prompt || ''),
+    },
+    ...(onUseAsReference ? [{
+      label: '添加到参考图',
+      icon: <Plus size={15} />,
+      onClick: onUseAsReference,
+    }] : []),
+  ]
+
   return (
-    <motion.div
-      onClick={() => onPreview({ url: imageUrl, type: 'result', task, imageIndex })}
-      className="group relative flex h-[clamp(260px,44vh,480px)] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-dark-border)] bg-[#101010]"
-      whileHover={{ scale: 1.01 }}
-      transition={{ duration: 0.2 }}
-    >
-      {loadState === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#151515] text-xs text-neutral-500">
-          正在载入结果...
-        </div>
-      )}
-
-      {loadState === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#151515] px-4 text-center text-xs text-red-300">
-          <AlertCircle size={20} />
-          图片载入失败，请到资产库查看
-        </div>
-      )}
-
-      <img
-        src={imageUrl}
-        alt="Generated"
-        className={clsx(
-          'max-h-full max-w-full object-contain transition-opacity duration-300',
-          loadState === 'loaded' ? 'opacity-100' : 'opacity-0'
-        )}
-        onLoad={() => setLoadState('loaded')}
-        onError={() => setLoadState('error')}
-      />
-
-      {loadState === 'loaded' && (
-        <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/[0.03]">
-          <span className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur-md">
-            {label}
-          </span>
-          {onUseAsReference && (
-            <AddToReferenceButton
-              onClick={(event) => {
-                event.stopPropagation()
-                onUseAsReference()
-              }}
-              className="absolute right-3 top-3"
-            />
+    <ContextMenu items={contextItems}>
+      {({ onContextMenu }) => (
+        <motion.div
+          onClick={() => onPreview({ url: imageUrl, type: 'result', task, imageIndex })}
+          onContextMenu={onContextMenu}
+          className="group relative flex h-[clamp(260px,44vh,480px)] w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-dark-border)] bg-[#101010]"
+          whileHover={{ scale: 1.01 }}
+          transition={{ duration: 0.2 }}
+        >
+          {loadState === 'loading' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#151515] text-xs text-neutral-500">
+              正在载入结果...
+            </div>
           )}
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              onDownload()
-            }}
-            className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white/80 opacity-0 backdrop-blur-md transition hover:bg-black/70 hover:text-white group-hover:opacity-100"
-            aria-label="下载图片"
-          >
-            <Download size={16} />
-          </button>
-        </div>
+
+          {loadState === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#151515] px-4 text-center text-xs text-red-300">
+              <AlertCircle size={20} />
+              图片载入失败，请到资产库查看
+            </div>
+          )}
+
+          <img
+            src={imageUrl}
+            alt="Generated"
+            className={clsx(
+              'max-h-full max-w-full object-contain transition-opacity duration-300',
+              loadState === 'loaded' ? 'opacity-100' : 'opacity-0'
+            )}
+            onLoad={() => setLoadState('loaded')}
+            onError={() => setLoadState('error')}
+          />
+
+          {loadState === 'loaded' && (
+            <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/[0.03]">
+              <span className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur-md">
+                {label}
+              </span>
+              {onUseAsReference && (
+                <AddToReferenceButton
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onUseAsReference()
+                  }}
+                  className="absolute right-3 top-3"
+                />
+              )}
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void revealFile(imageUrl).catch(() => {})
+                }}
+                className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/45 text-white/80 opacity-0 backdrop-blur-md transition hover:bg-black/70 hover:text-white group-hover:opacity-100"
+                aria-label="打开所在文件夹"
+              >
+                <FolderOpen size={16} />
+              </button>
+            </div>
+          )}
+        </motion.div>
       )}
-    </motion.div>
+    </ContextMenu>
   )
 }
 
@@ -412,28 +441,6 @@ export default function TaskCard({
       : `绘制完成 · ${successCount || resultCount} 张${elapsedSeconds ? ` · ${elapsedSeconds}秒` : ''}`
   const actionLabel = hasFailures ? '重新提交' : '重新生成'
 
-  const handleDownload = async (task: Task, imageUrl: string, index: number) => {
-    const link = document.createElement('a')
-    let objectUrl = ''
-
-    try {
-      if (!imageUrl.startsWith('data:')) {
-        const response = await fetch(imageUrl)
-        if (!response.ok) throw new Error(`图片下载失败（HTTP ${response.status}）`)
-        const blob = await response.blob()
-        objectUrl = URL.createObjectURL(blob)
-      }
-
-      link.href = objectUrl || imageUrl
-      link.download = `image2-${task.id}-${index + 1}.png`
-      document.body.appendChild(link)
-      link.click()
-    } finally {
-      link.remove()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }
-
   const handleRegenerateBatch = () => {
     const nextTimestamp = Date.now()
     const nextBatchId = createClientId(`batch-${nextTimestamp}`)
@@ -560,7 +567,6 @@ export default function TaskCard({
                   task={tile.task}
                   imageIndex={tile.imageIndex}
                   onPreview={setPreviewImage}
-                  onDownload={() => void handleDownload(tile.task, tile.imageUrl, tile.imageIndex)}
                   onUseAsReference={onUseAsReference ? () => onUseAsReference({
                     id: `result-${tile.task.id}-${tile.imageIndex}`,
                     filename: `image2-${tile.task.id}-${tile.imageIndex + 1}.png`,
@@ -633,11 +639,11 @@ export default function TaskCard({
             {previewImage.type === 'result' && (
               <button
                 type="button"
-                onClick={() => void handleDownload(previewImage.task || primaryTask, previewImage.url, previewImage.imageIndex ?? 0)}
+                onClick={() => void revealFile(previewImage.url).catch(() => {})}
                 className="absolute bottom-3 right-3 flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 text-sm text-white transition hover:bg-white/15"
               >
-                <Download size={16} />
-                下载
+                <FolderOpen size={16} />
+                打开所在文件夹
               </button>
             )}
           </div>

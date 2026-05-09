@@ -1,10 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AssetDaySummary, AssetItem, AssetListResponse } from '../assetTypes'
 import type { GenerationRequest } from '../types'
-import { Archive, ArrowUp, CalendarDays, ImageIcon, Maximize2, RotateCcw, Search, SlidersHorizontal, SquarePen } from 'lucide-react'
+import { Archive, ArrowUp, CalendarDays, Copy, FolderOpen, ImageIcon, MessageSquareText, RotateCcw, Search, SlidersHorizontal, SquarePen, Plus } from 'lucide-react'
 import clsx from 'clsx'
 import { readJsonResponse } from '../apiClient'
 import AddToReferenceButton from './AddToReferenceButton'
+import ContextMenu, { copyImageToClipboard, revealFile, type ContextMenuItem } from './ContextMenu'
 
 type LibraryViewProps = {
   refreshKey: number
@@ -241,75 +242,121 @@ const AssetTile = memo(function AssetTile({
 }: AssetTileProps) {
   const frame = getAssetFrame(asset)
 
-  return (
-    <article
-      className={clsx(
-        "group overflow-hidden rounded-lg border border-white/6 bg-[#151515] [content-visibility:auto] [contain-intrinsic-size:320px]",
-        "transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-[#181818] hover:shadow-lg hover:shadow-black/20",
-        frame.tile
-      )}
-    >
-      <div className={clsx("relative w-full overflow-hidden bg-black", frame.media)}>
-        <button
-          type="button"
-          onClick={() => onPreview(asset)}
-          className="absolute inset-0 block h-full w-full text-left"
-        >
-          <img
-            src={asset.thumbUrl}
-            alt="历史生成结果"
-            loading="lazy"
-            decoding="async"
-            className={clsx("h-full w-full transition-transform duration-300 group-hover:scale-[1.018]", frame.image)}
-          />
-        </button>
-        <AddToReferenceButton
-          onClick={event => {
-            event.stopPropagation()
-            onUseAsReference(asset)
-          }}
-          className="absolute right-2 top-2"
-        />
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/75 to-transparent p-2.5 opacity-0 transition group-hover:opacity-100">
-          <span className="rounded-full bg-black/45 px-2 py-1 text-[11px] text-neutral-300 backdrop-blur">
-            {asset.params.aspectRatio}
-          </span>
-          <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-black/50 text-neutral-200 backdrop-blur">
-            <Maximize2 size={14} />
-          </span>
-        </div>
-      </div>
+  const contextItems: ContextMenuItem[] = [
+    {
+      label: '打开所在文件夹',
+      icon: <FolderOpen size={15} />,
+      onClick: () => void revealFile(asset.imageUrl).catch(() => {}),
+    },
+    {
+      label: '复制图片',
+      icon: <Copy size={15} />,
+      onClick: () => void copyImageToClipboard(asset.imageUrl).catch(() => {}),
+    },
+    {
+      label: '复制提示词',
+      icon: <MessageSquareText size={15} />,
+      onClick: () => void navigator.clipboard.writeText(asset.prompt || ''),
+    },
+    {
+      label: '添加到参考图',
+      icon: <Plus size={15} />,
+      onClick: () => onUseAsReference(asset),
+    },
+    {
+      label: '重新编辑',
+      icon: <SquarePen size={15} />,
+      onClick: () => onEditAsset(asset),
+    },
+    {
+      label: '同参数再生成',
+      icon: <RotateCcw size={15} />,
+      onClick: () => onRegenerate(asset.params),
+    },
+  ]
 
-      <div className="space-y-2 p-3">
-        <p className="truncate text-sm leading-5 text-neutral-300" title={asset.prompt}>
-          {asset.prompt || '未提供提示词'}
-        </p>
-        <AssetReferenceStack asset={asset} />
-        <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-600">
-          <span className="flex items-center gap-1">
-            <ImageIcon size={12} />
-            {asset.params.resolution}
-          </span>
-          <button
-            type="button"
-            onClick={() => onEditAsset(asset)}
-            className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-neutral-500 transition hover:bg-white/8 hover:text-neutral-100"
-            aria-label="编辑资产"
-            title="编辑"
-          >
-            <SquarePen size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onRegenerate(asset.params)}
-            className="grid h-7 w-7 place-items-center rounded-lg text-neutral-500 transition hover:bg-white/8 hover:text-neutral-100"
-            aria-label="同参数再生成"
-          >
-            <RotateCcw size={13} />
-          </button>
-        </div>
-      </div>
-    </article>
+  return (
+    <ContextMenu items={contextItems}>
+      {({ onContextMenu }) => (
+        <article
+          onContextMenu={onContextMenu}
+          className={clsx(
+            "group overflow-hidden rounded-lg border border-white/6 bg-[#151515] [content-visibility:auto] [contain-intrinsic-size:320px]",
+            "transition hover:-translate-y-0.5 hover:border-white/14 hover:bg-[#181818] hover:shadow-lg hover:shadow-black/20",
+            frame.tile
+          )}
+        >
+          <div className={clsx("relative w-full overflow-hidden bg-black", frame.media)}>
+            <button
+              type="button"
+              onClick={() => onPreview(asset)}
+              className="absolute inset-0 block h-full w-full text-left"
+            >
+              <img
+                src={asset.thumbUrl}
+                alt="历史生成结果"
+                loading="lazy"
+                decoding="async"
+                className={clsx("h-full w-full transition-transform duration-300 group-hover:scale-[1.018]", frame.image)}
+              />
+            </button>
+            <AddToReferenceButton
+              onClick={event => {
+                event.stopPropagation()
+                onUseAsReference(asset)
+              }}
+              className="absolute right-2 top-2"
+            />
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/75 to-transparent p-2.5 opacity-0 transition group-hover:opacity-100">
+              <span className="rounded-full bg-black/45 px-2 py-1 text-[11px] text-neutral-300 backdrop-blur">
+                {asset.params.aspectRatio}
+              </span>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void revealFile(asset.imageUrl).catch(() => {})
+                }}
+                className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-black/50 text-neutral-200 backdrop-blur transition hover:bg-black/70 hover:text-white"
+                aria-label="打开所在文件夹"
+              >
+                <FolderOpen size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 p-3">
+            <p className="truncate text-sm leading-5 text-neutral-300" title={asset.prompt}>
+              {asset.prompt || '未提供提示词'}
+            </p>
+            <AssetReferenceStack asset={asset} />
+            <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-600">
+              <span className="flex items-center gap-1">
+                <ImageIcon size={12} />
+                {asset.params.resolution}
+              </span>
+              <button
+                type="button"
+                onClick={() => onEditAsset(asset)}
+                className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-neutral-500 transition hover:bg-white/8 hover:text-neutral-100"
+                aria-label="编辑资产"
+                title="编辑"
+              >
+                <SquarePen size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onRegenerate(asset.params)}
+                className="grid h-7 w-7 place-items-center rounded-lg text-neutral-500 transition hover:bg-white/8 hover:text-neutral-100"
+                aria-label="同参数再生成"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </div>
+          </div>
+        </article>
+      )}
+    </ContextMenu>
   )
 })
 
@@ -789,52 +836,86 @@ export default function LibraryView({ refreshKey, onRegenerate, onEditAsset, onU
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6 backdrop-blur-sm"
           onClick={() => setPreviewAsset(null)}
         >
-          <div className="grid max-h-[88vh] max-w-6xl gap-4 md:grid-cols-[minmax(0,1fr)_320px]" onClick={event => event.stopPropagation()}>
-            <img
-              src={previewAsset.imageUrl}
-              alt="资产预览"
-              className="max-h-[88vh] min-w-0 rounded-2xl border border-white/10 object-contain"
-            />
-            <aside className="flex max-h-[88vh] flex-col gap-4 overflow-y-auto rounded-2xl border border-white/8 bg-[#121212] p-5">
-              <div>
-                <div className="mb-1 text-xs text-neutral-500">提示词</div>
-                <p className="text-sm leading-6 text-neutral-200">{previewAsset.prompt || '未提供提示词'}</p>
+          <ContextMenu
+            items={[
+              {
+                label: '打开所在文件夹',
+                icon: <FolderOpen size={15} />,
+                onClick: () => void revealFile(previewAsset.imageUrl).catch(() => {}),
+              },
+              {
+                label: '复制图片',
+                icon: <Copy size={15} />,
+                onClick: () => void copyImageToClipboard(previewAsset.imageUrl).catch(() => {}),
+              },
+              {
+                label: '复制提示词',
+                icon: <MessageSquareText size={15} />,
+                onClick: () => void navigator.clipboard.writeText(previewAsset.prompt || ''),
+              },
+            ]}
+          >
+            {({ onContextMenu }) => (
+              <div
+                className="grid max-h-[88vh] max-w-6xl gap-4 md:grid-cols-[minmax(0,1fr)_320px]"
+                onClick={event => event.stopPropagation()}
+                onContextMenu={onContextMenu}
+              >
+                <img
+                  src={previewAsset.imageUrl}
+                  alt="资产预览"
+                  className="max-h-[88vh] min-w-0 rounded-2xl border border-white/10 object-contain"
+                />
+                <aside className="flex max-h-[88vh] flex-col gap-4 overflow-y-auto rounded-2xl border border-white/8 bg-[#121212] p-5">
+                  <div>
+                    <div className="mb-1 text-xs text-neutral-500">提示词</div>
+                    <p className="text-sm leading-6 text-neutral-200">{previewAsset.prompt || '未提供提示词'}</p>
+                  </div>
+                  {(previewAsset.referenceImages?.length || previewAsset.params.images.length) > 0 && (
+                    <div>
+                      <div className="mb-2 text-xs text-neutral-500">参考图</div>
+                      <AssetReferenceStack asset={previewAsset} expanded />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500">
+                    <span className="rounded-lg bg-white/5 px-2.5 py-2">比例 {previewAsset.params.aspectRatio}</span>
+                    <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.resolution}</span>
+                    <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.model}</span>
+                    <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.outputFormat.toUpperCase()}</span>
+                  </div>
+                  <div className="mt-auto grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => void revealFile(previewAsset.imageUrl).catch(() => {})}
+                      className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-sm font-medium text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.1]"
+                    >
+                      <FolderOpen size={15} />
+                      打开文件夹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onEditAsset(previewAsset)
+                        setPreviewAsset(null)
+                      }}
+                      className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-sm font-medium text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.1]"
+                    >
+                      <SquarePen size={15} />
+                      重新编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRegenerate(previewAsset.params)}
+                      className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-xl bg-white text-sm font-medium text-black transition hover:bg-neutral-200"
+                    >
+                      <RotateCcw size={15} />
+                      同参数再生成
+                    </button>
+                  </div>
+                </aside>
               </div>
-              {(previewAsset.referenceImages?.length || previewAsset.params.images.length) > 0 && (
-                <div>
-                  <div className="mb-2 text-xs text-neutral-500">参考图</div>
-                  <AssetReferenceStack asset={previewAsset} expanded />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500">
-                <span className="rounded-lg bg-white/5 px-2.5 py-2">比例 {previewAsset.params.aspectRatio}</span>
-                <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.resolution}</span>
-                <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.model}</span>
-                <span className="rounded-lg bg-white/5 px-2.5 py-2">{previewAsset.params.outputFormat.toUpperCase()}</span>
-              </div>
-              <div className="mt-auto grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEditAsset(previewAsset)
-                    setPreviewAsset(null)
-                  }}
-                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-sm font-medium text-neutral-200 transition hover:border-white/20 hover:bg-white/[0.1]"
-                >
-                  <SquarePen size={15} />
-                  重新编辑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRegenerate(previewAsset.params)}
-                  className="flex h-10 items-center justify-center gap-2 rounded-xl bg-white text-sm font-medium text-black transition hover:bg-neutral-200"
-                >
-                  <RotateCcw size={15} />
-                  同参数再生成
-                </button>
-              </div>
-            </aside>
-          </div>
+            )}
+          </ContextMenu>
         </div>
       )}
     </div>

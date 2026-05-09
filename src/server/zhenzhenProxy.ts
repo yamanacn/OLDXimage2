@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Buffer } from 'node:buffer'
+import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
@@ -24,6 +25,8 @@ interface PollResult {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
+
+const requireElectron = createRequire(import.meta.url)
 const FALLBACK_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
 
@@ -365,6 +368,34 @@ export const createApiHandler = (runtime: ServerRuntime) => async (request: Inco
 
   if (pathname === '/api/assets') {
     handleAssetsRoute(request, response, runtime)
+    return
+  }
+
+  if (pathname === '/api/reveal-file') {
+    try {
+      const body = await readJsonBody<{ imageUrl: string }>(request)
+      const imageUrl = body.imageUrl || ''
+      const match = /[?&]id=([^&]+)/.exec(imageUrl)
+      if (!match) {
+        response.writeHead(400, JSON_HEADERS)
+        response.end(JSON.stringify({ ok: false, error: 'Invalid image URL' }))
+        return
+      }
+
+      const filepath = decodeURIComponent(match[1])
+      const electron = requireElectron('electron') as { shell?: { showItemInFolder?: (path: string) => void } }
+      if (electron.shell?.showItemInFolder) {
+        electron.shell.showItemInFolder(filepath)
+        response.writeHead(200, JSON_HEADERS)
+        response.end(JSON.stringify({ ok: true }))
+      } else {
+        response.writeHead(500, JSON_HEADERS)
+        response.end(JSON.stringify({ ok: false, error: 'shell.showItemInFolder not available' }))
+      }
+    } catch (error) {
+      response.writeHead(500, JSON_HEADERS)
+      response.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }))
+    }
     return
   }
 
