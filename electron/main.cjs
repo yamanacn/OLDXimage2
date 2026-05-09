@@ -50,8 +50,9 @@ if (!isDev) {
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
     autoUpdater.setFeedURL({
-      provider: 'generic',
-      url: 'https://ghfast.top/https://github.com/yamanacn/OLDXimage2/releases/latest/download',
+      provider: 'github',
+      owner: 'yamanacn',
+      repo: 'OLDXimage2',
     })
 
     autoUpdater.on('update-available', (info) => {
