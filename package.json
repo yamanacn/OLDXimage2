@@ -46,7 +46,6 @@
     "appId": "com.oldx.image2",
     "productName": "OLDXImage2",
     "electronVersion": "42.0.1",
-    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "release"
     },
