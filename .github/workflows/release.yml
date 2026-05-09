@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 1.1.0)'
+        description: 'Release version (e.g. 1.2.0)'
         required: true
         type: string
 
@@ -29,14 +29,14 @@ jobs:
       - run: npm run build
 
       - name: Build Windows installer
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish never
 
       - uses: actions/upload-artifact@v4
         with:
           name: win-exe
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
 
   build-mac:
     runs-on: macos-latest
@@ -55,11 +55,31 @@ jobs:
       - run: npm run build
 
       - name: Build macOS DMG
-        run: npx electron-builder --mac --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --publish never
 
       - uses: actions/upload-artifact@v4
         with:
           name: mac-dmg
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/latest-mac.yml
+
+  publish:
+    needs: [build-win, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        run: |
+          gh release create v${{ inputs.version }} \
+            --title "${{ inputs.version }}" \
+            --latest \
+            artifacts/win-exe/* \
+            artifacts/mac-dmg/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
