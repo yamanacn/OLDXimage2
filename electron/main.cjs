@@ -8,7 +8,38 @@ const isDev = !app.isPackaged
 const APP_NAME = 'OLDXImage2'
 
 app.setName(APP_NAME)
-Menu.setApplicationMenu(null)
+
+if (process.platform === 'darwin') {
+  const template = [
+    {
+      label: APP_NAME,
+      submenu: [
+        { role: 'about', label: `关于 ${APP_NAME}` },
+        { type: 'separator' },
+        { role: 'hide', label: '隐藏' },
+        { role: 'hideOthers', label: '隐藏其他' },
+        { role: 'unhide', label: '全部显示' },
+        { type: 'separator' },
+        { role: 'quit', label: `退出 ${APP_NAME}` },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' },
+      ],
+    },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+} else {
+  Menu.setApplicationMenu(null)
+}
 
 const resolveServerEntry = () => {
   if (isDev) return path.join(__dirname, '..', 'build-server', 'electronRuntime.js')
