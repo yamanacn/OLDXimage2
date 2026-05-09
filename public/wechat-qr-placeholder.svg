@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+  <rect width="900" height="1200" fill="#ffffff"/>
+  <rect x="130" y="250" width="640" height="640" rx="28" fill="#f4f4f5" stroke="#d4d4d8" stroke-width="4"/>
+  <path d="M265 387h132v132H265zM503 387h132v132H503zM265 625h132v132H265z" fill="#111"/>
+  <path d="M300 422h62v62h-62zM538 422h62v62h-62zM300 660h62v62h-62z" fill="#fff"/>
+  <text x="450" y="960" text-anchor="middle" font-family="Arial, sans-serif" font-size="44" fill="#a3a3a3">请替换为微信二维码</text>
+  <text x="450" y="1024" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#c4c4c4">public/wechat-qr.jpg</text>
+</svg>
