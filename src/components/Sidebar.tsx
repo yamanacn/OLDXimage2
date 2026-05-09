@@ -9,6 +9,7 @@ import {
   KeyRound,
   Settings,
 } from 'lucide-react'
+import UpdateChecker from './UpdateChecker'
 import clsx from 'clsx'
 
 export type WorkspaceView = 'create' | 'library' | 'promptReference' | 'tasks' | 'settings'
@@ -298,6 +299,21 @@ export default function Sidebar({
                 )}
               </button>
             )}
+          </div>
+
+          <div className={clsx("shrink-0 border-t border-white/5 pt-3", collapsed ? "flex justify-center px-0" : "px-3")}>
+            <div className={clsx("flex items-center gap-1", collapsed ? "flex-col" : "justify-between")}>
+              {collapsed ? (
+                <UpdateChecker />
+              ) : (
+                <>
+                  <span className="text-[10px] font-mono text-neutral-700">v{__APP_VERSION__}</span>
+                  <div className="relative">
+                    <UpdateChecker />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </nav>
       </div>

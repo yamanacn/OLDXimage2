@@ -1,8 +1,9 @@
-const { app, BrowserWindow, Menu, shell } = require('electron')
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
 let serverHandle
+let mainWindow
 
 const isDev = !app.isPackaged
 const APP_NAME = 'OLDXImage2'
@@ -41,6 +42,87 @@ if (process.platform === 'darwin') {
   Menu.setApplicationMenu(null)
 }
 
+// Auto-updater setup (production only)
+let autoUpdater = null
+if (!isDev) {
+  try {
+    autoUpdater = require('electron-updater').autoUpdater
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('update-available', (info) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-state', {
+          type: 'available',
+          version: info.version,
+          releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+        })
+      }
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-state', { type: 'not-available' })
+      }
+    })
+
+    autoUpdater.on('download-progress', (progress) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-state', {
+          type: 'progress',
+          percent: Math.round(progress.percent),
+          speed: Math.round(progress.bytesPerSecond / 1024),
+        })
+      }
+    })
+
+    autoUpdater.on('update-downloaded', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-state', { type: 'downloaded' })
+      }
+    })
+
+    autoUpdater.on('error', (error) => {
+      console.error('[updater]', error.message)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+      }
+    })
+  } catch (error) {
+    console.error('[updater] Failed to initialize', error.message)
+  }
+}
+
+// IPC handlers
+ipcMain.on('get-app-version', (event) => {
+  event.returnValue = app.getVersion()
+})
+
+ipcMain.handle('update:check', async () => {
+  if (!autoUpdater) return { type: 'error', message: 'Updater not available' }
+  try {
+    await autoUpdater.checkForUpdates()
+    return { type: 'checking' }
+  } catch (error) {
+    return { type: 'error', message: error.message }
+  }
+})
+
+ipcMain.handle('update:download', async () => {
+  if (!autoUpdater) return
+  try {
+    await autoUpdater.downloadUpdate()
+  } catch (error) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+    }
+  }
+})
+
+ipcMain.handle('update:install', () => {
+  if (autoUpdater) autoUpdater.quitAndInstall(false, true)
+})
+
 const resolveServerEntry = () => {
   if (isDev) return path.join(__dirname, '..', 'build-server', 'electronRuntime.js')
   return path.join(process.resourcesPath, 'build-server', 'electronRuntime.js')
@@ -55,6 +137,8 @@ const resolveWindowIcon = () => {
   if (isDev) return path.join(__dirname, '..', 'build', 'icon.ico')
   return path.join(process.resourcesPath, 'build', 'icon.ico')
 }
+
+const resolvePreload = () => path.join(__dirname, 'preload.cjs')
 
 const createWindow = async () => {
   const { startLocalServer } = await import(pathToFileURL(resolveServerEntry()).href)
@@ -71,7 +155,7 @@ const createWindow = async () => {
     runtime,
   })
 
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     title: APP_NAME,
     width: 1440,
     height: 980,
@@ -85,22 +169,23 @@ const createWindow = async () => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: resolvePreload(),
     },
   })
 
-  window.setMenuBarVisibility(false)
+  mainWindow.setMenuBarVisibility(false)
 
-  window.once('ready-to-show', () => {
-    window.setTitle(APP_NAME)
-    window.show()
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.setTitle(APP_NAME)
+    mainWindow.show()
   })
 
-  window.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
 
-  await window.loadURL(serverHandle.url)
+  await mainWindow.loadURL(serverHandle.url)
 }
 
 app.whenReady().then(() => {
