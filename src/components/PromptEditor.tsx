@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Image as ImageIcon } from 'lucide-react'
+import { ClipboardPaste, Copy, Image as ImageIcon, TextSelect } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReferenceImagePayload } from '../imagePayload'
+import ContextMenu from './ContextMenu'
 
 type PromptEditorProps = {
   value: string
@@ -9,6 +10,7 @@ type PromptEditorProps = {
   onSubmit?: () => void
   canSubmit?: boolean
   images: ReferenceImagePayload[]
+  onImagePaste?: (files: File[]) => void
   placeholder?: string
 }
 
@@ -63,6 +65,7 @@ export default function PromptEditor({
   onSubmit,
   canSubmit = true,
   images,
+  onImagePaste,
   placeholder = '请直接描述你想生成的图片内容...',
 }: PromptEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
@@ -338,8 +341,67 @@ export default function PromptEditor({
     return () => window.removeEventListener('pointerdown', handlePointerDown, true)
   }, [mentionOpen, preview])
 
+  const handleContextPaste = useCallback(async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read()
+      for (const item of clipboardItems) {
+        if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+          const imageType = item.types.includes('image/png') ? 'image/png' : 'image/jpeg'
+          const blob = await item.getType(imageType)
+          const file = new File([blob], `clipboard-image.${imageType === 'image/png' ? 'png' : 'jpg'}`, { type: imageType })
+          if (onImagePaste) {
+            onImagePaste([file])
+            return
+          }
+        }
+      }
+    } catch {
+      // Clipboard API might fail, fall through to text paste
+    }
+
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) insertPlainText(text)
+    } catch {
+      // Ignore clipboard read failures
+    }
+  }, [onImagePaste, insertPlainText])
+
+  const contextMenuItems = [
+    {
+      label: '粘贴',
+      icon: <ClipboardPaste size={15} />,
+      onClick: () => void handleContextPaste(),
+    },
+    {
+      label: '复制',
+      icon: <Copy size={15} />,
+      onClick: () => {
+        const selection = window.getSelection()
+        if (selection && selection.toString()) {
+          void navigator.clipboard.writeText(selection.toString())
+        }
+      },
+    },
+    {
+      label: '全选',
+      icon: <TextSelect size={15} />,
+      onClick: () => {
+        const root = editorRef.current
+        if (!root) return
+        const range = document.createRange()
+        range.selectNodeContents(root)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+      },
+    },
+  ]
+
   return (
-    <div ref={shellRef} className="relative min-h-0 flex-1">
+    <ContextMenu items={contextMenuItems}>
+      {({ onContextMenu }) => (
+    <div ref={shellRef} className="relative min-h-0 flex-1" onContextMenu={onContextMenu}>
       {isEmpty && (
         <div className="pointer-events-none absolute left-0 top-0 text-sm leading-relaxed text-neutral-600">
           {placeholder}
@@ -435,5 +497,7 @@ export default function PromptEditor({
         )}
       </AnimatePresence>
     </div>
+      )}
+    </ContextMenu>
   )
 }

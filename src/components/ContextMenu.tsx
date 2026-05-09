@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export type ContextMenuItem = {
@@ -6,7 +7,6 @@ export type ContextMenuItem = {
   icon: React.ReactNode
   onClick: () => void
   danger?: boolean
-  separator?: boolean
 }
 
 type ContextMenuProps = {
@@ -62,41 +62,45 @@ export default function ContextMenu({ items, children }: ContextMenuProps) {
     setState({ x, y })
   }
 
+  const menu = (
+    <AnimatePresence>
+      {state && (
+        <>
+          <div className="fixed inset-0 z-[10000]" onClick={close} onContextMenu={event => { event.preventDefault(); close() }} />
+          <motion.div
+            ref={menuRef}
+            initial={{ opacity: 0, scale: 0.92, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -2 }}
+            transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+            style={{ left: state.x, top: state.y, width: MENU_WIDTH }}
+            className="fixed z-[10001] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/95 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.56),0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur-xl"
+          >
+            {items.map((item, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => { item.onClick(); close() }}
+                className={`flex w-full items-center gap-3 px-4 py-[9px] text-[13px] transition-colors ${
+                  item.danger
+                    ? 'text-red-300 hover:bg-red-500/10'
+                    : 'text-neutral-200 hover:bg-white/[0.06]'
+                }`}
+              >
+                <span className="grid h-4 w-4 shrink-0 place-items-center text-neutral-400">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+
   return (
     <>
       {children({ onContextMenu: handleContextMenu })}
-      <AnimatePresence>
-        {state && (
-          <>
-            <div className="fixed inset-0 z-[60]" onClick={close} onContextMenu={event => { event.preventDefault(); close() }} />
-            <motion.div
-              ref={menuRef}
-              initial={{ opacity: 0, scale: 0.92, y: -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -2 }}
-              transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
-              style={{ left: state.x, top: state.y, width: MENU_WIDTH }}
-              className="fixed z-[70] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/95 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.56),0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur-xl"
-            >
-              {items.map((item, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => { item.onClick(); close() }}
-                  className={`flex w-full items-center gap-3 px-4 py-[9px] text-[13px] transition-colors ${
-                    item.danger
-                      ? 'text-red-300 hover:bg-red-500/10'
-                      : 'text-neutral-200 hover:bg-white/[0.06]'
-                  }`}
-                >
-                  <span className="grid h-4 w-4 shrink-0 place-items-center text-neutral-400">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {createPortal(menu, document.body)}
     </>
   )
 }

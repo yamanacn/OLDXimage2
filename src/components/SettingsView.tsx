@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ExternalLink, FolderOpen, Globe2, KeyRound, MessageCircle, QrCode, Save, Settings } from 'lucide-react'
+import { ClipboardPaste, ExternalLink, FolderOpen, Globe2, KeyRound, MessageCircle, QrCode, Save, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import type { ProxyConfigResponse } from '../apiTypes'
 import type { AssetConfigResponse } from '../assetTypes'
@@ -219,15 +219,30 @@ export default function SettingsView({
                 <KeyRound size={12} />
                 API Key
               </label>
-              <div className={clsx('api-key-input-shell rounded-xl', highlightApiKey && 'api-key-guidance-ring')}>
+              <div className={clsx('api-key-input-shell flex gap-2', highlightApiKey && 'api-key-guidance-ring')}>
                 <input
                   ref={apiKeyInputRef}
                   type="password"
                   value={apiKeyDraft}
                   onChange={event => setApiKeyDraft(event.target.value)}
                   placeholder={config.configured ? '输入新 Key 后保存' : '请输入 API Key'}
-                  className="relative z-10 h-11 w-full rounded-xl border border-white/10 bg-[#101010] px-3 text-sm text-neutral-200 outline-none transition placeholder:text-neutral-700 focus:border-white/70 focus:ring-2 focus:ring-[var(--color-focus-ring)]"
+                  className="relative z-10 h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#101010] px-3 text-sm text-neutral-200 outline-none transition placeholder:text-neutral-700 focus:border-white/70 focus:ring-2 focus:ring-[var(--color-focus-ring)]"
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.readText()
+                      .then(text => {
+                        if (text) setApiKeyDraft(text)
+                      })
+                      .catch(() => {})
+                  }}
+                  title="从剪贴板粘贴"
+                  className="flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#101010] px-3 text-xs text-neutral-500 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-neutral-200"
+                >
+                  <ClipboardPaste size={14} />
+                  粘贴
+                </button>
               </div>
             </div>
 

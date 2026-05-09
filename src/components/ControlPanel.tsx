@@ -425,6 +425,7 @@ export default function ControlPanel({
             onSubmit={handleGenerate}
             canSubmit={!isGenerateDisabled}
             images={images}
+            onImagePaste={readFiles}
             placeholder="请直接描述你想生成的图片内容..."
           />
         </div>
