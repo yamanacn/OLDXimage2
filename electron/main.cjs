@@ -103,11 +103,19 @@ ipcMain.on('get-app-version', (event) => {
 })
 
 ipcMain.handle('update:check', async () => {
-  if (!autoUpdater) return { type: 'error', message: 'Updater not available' }
+  if (!autoUpdater) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-state', { type: 'error', message: '当前为开发模式，不支持自动更新' })
+    }
+    return { type: 'error', message: 'Updater not available' }
+  }
   try {
     await autoUpdater.checkForUpdates()
     return { type: 'checking' }
   } catch (error) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+    }
     return { type: 'error', message: error.message }
   }
 })

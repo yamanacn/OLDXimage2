@@ -29,11 +29,19 @@ const addSkippedVersion = (version: string) => {
 
 const isSkipped = (version: string) => getSkippedVersions().includes(version)
 
-export default function UpdateChecker() {
+const easeOut = [0.23, 1, 0.32, 1] as const
+
+type Props = { collapsed?: boolean }
+
+export default function UpdateChecker({ collapsed = false }: Props) {
   const [state, setState] = useState<UpdateState>({ type: 'idle' })
   const [badge, setBadge] = useState(false)
   const timerRef = useRef<number>(0)
   const api = window.electronAPI
+
+  const isDownloading = state.type === 'downloading'
+  const isDownloaded = state.type === 'downloaded'
+  const showProgress = isDownloading || isDownloaded
 
   useEffect(() => {
     if (!api?.onUpdateState) return
@@ -60,7 +68,6 @@ export default function UpdateChecker() {
     })
   }, [api])
 
-  // Silent check on mount
   useEffect(() => {
     if (api?.checkUpdate) {
       const timer = window.setTimeout(() => { void api.checkUpdate!() }, 3000)
@@ -69,10 +76,21 @@ export default function UpdateChecker() {
   }, [api])
 
   const handleCheck = useCallback(() => {
-    if (!api?.checkUpdate || state.type === 'checking' || state.type === 'downloading') return
+    if (!api?.checkUpdate || state.type === 'checking' || isDownloading) return
     setState({ type: 'checking' })
-    void api.checkUpdate()
-  }, [api, state.type])
+    api.checkUpdate().then((result) => {
+      if (result?.type === 'error') {
+        setState({ type: 'error', message: result.message || '更新检查不可用' })
+        window.clearTimeout(timerRef.current)
+        timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 4000)
+      }
+    })
+    window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => {
+      setState((prev) => (prev.type === 'checking' ? { type: 'error', message: '检查超时，请稍后重试' } : prev))
+      timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 4000)
+    }, 15000)
+  }, [api, state.type, isDownloading])
 
   const handleDownload = useCallback(() => {
     if (api?.downloadUpdate) void api.downloadUpdate()
@@ -89,6 +107,7 @@ export default function UpdateChecker() {
     setBadge(false)
   }, [state])
 
+  /* ── icon button (used when collapsed OR no download in progress in expanded) ── */
   const iconEl = (
     <motion.button
       type="button"
@@ -111,7 +130,7 @@ export default function UpdateChecker() {
           <motion.span key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}>
             <AlertCircle size={16} className="text-red-400" />
           </motion.span>
-        ) : state.type === 'downloading' || state.type === 'downloaded' ? (
+        ) : isDownloading || isDownloaded ? (
           <motion.span key="dl" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}>
             <Download size={16} className="text-cyan-300" />
           </motion.span>
@@ -121,23 +140,94 @@ export default function UpdateChecker() {
           </motion.span>
         )}
       </AnimatePresence>
-      {badge && state.type !== 'downloading' && state.type !== 'downloaded' && (
+      {badge && !showProgress && (
         <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
       )}
     </motion.button>
   )
 
+  /* ── capsule progress bar ── */
+  const percent = state.type === 'downloading' ? state.percent : isDownloaded ? 100 : 0
+
+  const progressBar = (
+    <motion.div
+      key="capsule"
+      initial={{ opacity: 0, scale: 0.92, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.92, y: -4 }}
+      transition={{ duration: 0.25, ease: easeOut }}
+      onClick={isDownloaded ? handleInstall : undefined}
+      className={collapsed
+        ? "relative h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-full bg-white/8"
+        : "relative h-7 w-full shrink-0 cursor-pointer overflow-hidden rounded-full bg-white/8"}
+    >
+      {/* fill */}
+      <motion.div
+        className="absolute inset-y-0 left-0 rounded-full"
+        initial={false}
+        animate={{
+          width: `${percent}%`,
+          backgroundColor: isDownloaded ? '#10b981' : '#22d3ee',
+        }}
+        transition={{ width: { duration: 0.35, ease: 'easeOut' }, backgroundColor: { duration: 0.4 } }}
+      />
+
+      {/* shimmer (downloading only) */}
+      {isDownloading && (
+        <motion.div
+          className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+          style={{ skewX: '-20deg' }}
+          initial={{ x: '-100%' }}
+          animate={{ x: '400%' }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+        />
+      )}
+
+      {/* text */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[11px] font-medium tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+          {isDownloaded
+            ? (collapsed ? 'OK' : '点击重启')
+            : (collapsed ? `${percent}%` : `更新 ${percent}%`)}
+        </span>
+      </div>
+    </motion.div>
+  )
+
+  /* ── collapsed layout: icon only, swap to capsule on download ── */
+  if (collapsed) {
+    return (
+      <div className="relative">
+        <AnimatePresence mode="wait">
+          {showProgress ? progressBar : iconEl}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  /* ── expanded layout ── */
   return (
     <>
-      {iconEl}
+      <AnimatePresence mode="wait">
+        {showProgress ? (
+          <div key="progress-row" className="flex w-full items-center">
+            {progressBar}
+          </div>
+        ) : (
+          <div key="icon-row" className="flex items-center gap-1">
+            {iconEl}
+          </div>
+        )}
+      </AnimatePresence>
 
+      {/* popup cards */}
       <AnimatePresence>
         {state.type === 'available' && (
           <motion.div
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            transition={{ duration: 0.2, ease: easeOut }}
             className="absolute bottom-full left-0 mb-2 w-[280px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -170,36 +260,12 @@ export default function UpdateChecker() {
           </motion.div>
         )}
 
-        {state.type === 'downloading' && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2 }}
-            className="absolute bottom-full left-0 mb-2 w-[280px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
-          >
-            <div className="mb-2 text-xs font-medium text-neutral-300">正在下载更新...</div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-              <motion.div
-                className="h-full rounded-full bg-cyan-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${state.percent}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-            <div className="mt-2 flex justify-between text-[11px] text-neutral-500">
-              <span>{state.percent}%</span>
-              <span>{state.speed > 0 ? `${state.speed} KB/s` : ''}</span>
-            </div>
-          </motion.div>
-        )}
-
         {state.type === 'downloaded' && (
           <motion.div
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.2, ease: easeOut }}
             className="absolute bottom-full left-0 mb-2 w-[280px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
           >
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-emerald-300">
