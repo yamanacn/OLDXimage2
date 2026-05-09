@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, Download, RefreshCw, X, AlertCircle } from 'lucide-react'
 
@@ -37,6 +38,7 @@ export default function UpdateChecker({ collapsed = false }: Props) {
   const [state, setState] = useState<UpdateState>({ type: 'idle' })
   const [badge, setBadge] = useState(false)
   const timerRef = useRef<number>(0)
+  const anchorRef = useRef<HTMLDivElement>(null)
   const api = window.electronAPI
 
   const isDownloading = state.type === 'downloading'
@@ -206,91 +208,104 @@ export default function UpdateChecker({ collapsed = false }: Props) {
   }
 
   /* ── expanded layout ── */
+  const popupStyle = anchorRef.current
+    ? (() => {
+        const r = anchorRef.current.getBoundingClientRect()
+        return { position: 'fixed' as const, bottom: window.innerHeight - r.top + 8, left: r.left, width: 280 }
+      })()
+    : { position: 'fixed' as const, bottom: 80, left: 8, width: 280 }
+
+  const popupCard = (
+    <AnimatePresence>
+      {state.type === 'available' && (
+        <motion.div
+          style={popupStyle}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: easeOut }}
+          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold text-white">发现新版本 v{state.version}</span>
+            <button type="button" onClick={handleSkip} className="text-neutral-600 hover:text-neutral-300 transition">
+              <X size={14} />
+            </button>
+          </div>
+          {state.releaseNotes && (
+            <p className="mb-3 text-xs leading-relaxed text-neutral-400">{state.releaseNotes.slice(0, 200)}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
+            >
+              <Download size={13} />
+              更新
+            </button>
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:border-white/20 hover:text-neutral-200"
+            >
+              跳过
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {state.type === 'downloaded' && (
+        <motion.div
+          style={popupStyle}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: easeOut }}
+          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+        >
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-emerald-300">
+            <CheckCircle size={15} />
+            下载完成
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleInstall}
+              className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
+            >
+              立即重启
+            </button>
+            <button
+              type="button"
+              onClick={() => setState({ type: 'idle' })}
+              className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:text-neutral-200"
+            >
+              稍后
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
   return (
     <>
-      <AnimatePresence mode="wait">
-        {showProgress ? (
-          <div key="progress-row" className="flex w-full items-center">
-            {progressBar}
-          </div>
-        ) : (
-          <div key="icon-row" className="flex items-center gap-1">
-            {iconEl}
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* popup cards */}
-      <AnimatePresence>
-        {state.type === 'available' && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: easeOut }}
-            className="absolute bottom-full left-0 mb-2 w-[280px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-white">发现新版本 v{state.version}</span>
-              <button type="button" onClick={handleSkip} className="text-neutral-600 hover:text-neutral-300 transition">
-                <X size={14} />
-              </button>
+      <div ref={anchorRef}>
+        <AnimatePresence mode="wait">
+          {showProgress ? (
+            <div key="progress-row" className="flex w-full items-center">
+              {progressBar}
             </div>
-            {state.releaseNotes && (
-              <p className="mb-3 text-xs leading-relaxed text-neutral-400">{state.releaseNotes.slice(0, 200)}</p>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
-              >
-                <Download size={13} />
-                更新
-              </button>
-              <button
-                type="button"
-                onClick={handleSkip}
-                className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:border-white/20 hover:text-neutral-200"
-              >
-                跳过
-              </button>
+          ) : (
+            <div key="icon-row" className="flex items-center gap-1">
+              {iconEl}
             </div>
-          </motion.div>
-        )}
-
-        {state.type === 'downloaded' && (
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: easeOut }}
-            className="absolute bottom-full left-0 mb-2 w-[280px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
-          >
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-emerald-300">
-              <CheckCircle size={15} />
-              下载完成
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleInstall}
-                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
-              >
-                立即重启
-              </button>
-              <button
-                type="button"
-                onClick={() => setState({ type: 'idle' })}
-                className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:text-neutral-200"
-              >
-                稍后
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
+      {createPortal(popupCard, document.body)}
     </>
   )
 }
