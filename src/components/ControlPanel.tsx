@@ -25,13 +25,15 @@ const RESOLUTIONS = [
 const THUMBNAIL_LAYOUT_TRANSITION = {
   type: 'spring' as const,
   bounce: 0,
-  duration: 0.68,
+  duration: 0.38,
+  stiffness: 400,
+  damping: 32,
 }
 
 const THUMBNAIL_EXIT_TRANSITION = {
   type: 'spring' as const,
   bounce: 0,
-  duration: 0.28,
+  duration: 0.22,
 }
 
 const getClipboardImageFiles = (clipboardData: DataTransfer) => {

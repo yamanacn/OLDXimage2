@@ -424,11 +424,22 @@ export default function TaskCard({
     .filter(task => task.endedAt)
     .map(task => Math.max(1, Math.round(((task.endedAt ?? task.startedAt) - task.startedAt) / 1000)))
     .sort((a, b) => b - a)[0]
-  const timeStr = new Date(primaryTask.timestamp).toLocaleTimeString('zh-CN', {
+  const taskDate = new Date(primaryTask.timestamp)
+  const timeStr = taskDate.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   })
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const dayLabel = isSameDay(taskDate, today)
+    ? '今天'
+    : isSameDay(taskDate, yesterday)
+      ? '昨天'
+      : taskDate.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
   const gridCols = tiles.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'
   const referenceImages = params.images.filter(image => image.dataUrl || image.thumbUrl)
   const resultCount = orderedTasks.reduce((sum, task) => sum + (task.resultImages?.length ?? 0), 0)
@@ -470,7 +481,7 @@ export default function TaskCard({
     <div className="flex flex-col gap-3">
       <div className="ml-1 flex items-center gap-2 text-sm font-medium text-neutral-500">
         <Clock size={14} />
-        <span>今天 {timeStr}</span>
+        <span>{dayLabel} {timeStr}</span>
         {batchSize > 1 && (
           <span className="rounded-full border border-white/6 bg-white/[0.03] px-2 py-0.5 text-[11px] text-neutral-600">
             批次 {batchSize} 张

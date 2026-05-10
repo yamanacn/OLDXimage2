@@ -129,7 +129,7 @@ export default function UpdateChecker({ collapsed = false }: Props) {
             <CheckCircle size={16} className="text-emerald-400" />
           </motion.span>
         ) : state.type === 'error' ? (
-          <motion.span key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.span key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} title={`${state.message}，请确保已开启网络代理`}>
             <AlertCircle size={16} className="text-red-400" />
           </motion.span>
         ) : isDownloading || isDownloaded ? (
@@ -217,6 +217,41 @@ export default function UpdateChecker({ collapsed = false }: Props) {
 
   const popupCard = (
     <AnimatePresence>
+      {state.type === 'checking' && (
+        <motion.div
+          style={popupStyle}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: easeOut }}
+          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium text-neutral-300">
+            <RefreshCw size={15} className="animate-spin text-cyan-400" />
+            正在检查更新...
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+            如检查失败，请确保已开启网络代理（魔法网络）
+          </p>
+        </motion.div>
+      )}
+
+      {state.type === 'not-available' && (
+        <motion.div
+          style={popupStyle}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: easeOut }}
+          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium text-emerald-300">
+            <CheckCircle size={15} />
+            已是最新版 v{__APP_VERSION__}
+          </div>
+        </motion.div>
+      )}
+
       {state.type === 'available' && (
         <motion.div
           style={popupStyle}
@@ -251,38 +286,6 @@ export default function UpdateChecker({ collapsed = false }: Props) {
               className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:border-white/20 hover:text-neutral-200"
             >
               跳过
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {state.type === 'downloaded' && (
-        <motion.div
-          style={popupStyle}
-          initial={{ opacity: 0, y: 8, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.96 }}
-          transition={{ duration: 0.2, ease: easeOut }}
-          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
-        >
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-emerald-300">
-            <CheckCircle size={15} />
-            下载完成
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleInstall}
-              className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
-            >
-              立即重启
-            </button>
-            <button
-              type="button"
-              onClick={() => setState({ type: 'idle' })}
-              className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:text-neutral-200"
-            >
-              稍后
             </button>
           </div>
         </motion.div>
