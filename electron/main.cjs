@@ -43,6 +43,16 @@ if (process.platform === 'darwin') {
 }
 
 // Auto-updater setup (production only)
+const RELEASE_URL = 'https://github.com/yamanacn/OLDXimage2/releases/latest'
+
+const translateError = (msg) => {
+  const m = (msg || '').toLowerCase()
+  if (m.includes('enotfound') || m.includes('getaddrinfo')) return '无法连接更新服务器'
+  if (m.includes('econnrefused') || m.includes('err_connection')) return '网络连接失败'
+  if (m.includes('etimedout') || m.includes('timed out')) return '连接超时'
+  return '更新失败，请确保已开启网络代理'
+}
+
 let autoUpdater = null
 if (!isDev) {
   try {
@@ -90,7 +100,12 @@ if (!isDev) {
     autoUpdater.on('error', (error) => {
       console.error('[updater]', error.message)
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+        mainWindow.webContents.send('update-state', {
+          type: 'error',
+          message: translateError(error.message),
+          rawMessage: error.message,
+          releaseUrl: RELEASE_URL,
+        })
       }
     })
   } catch (error) {
@@ -106,7 +121,7 @@ ipcMain.on('get-app-version', (event) => {
 ipcMain.handle('update:check', async () => {
   if (!autoUpdater) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: '当前为开发模式，不支持自动更新' })
+      mainWindow.webContents.send('update-state', { type: 'error', message: '当前为开发模式，不支持自动更新', releaseUrl: RELEASE_URL })
     }
     return { type: 'error', message: 'Updater not available' }
   }
@@ -115,7 +130,7 @@ ipcMain.handle('update:check', async () => {
     return { type: 'checking' }
   } catch (error) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+      mainWindow.webContents.send('update-state', { type: 'error', message: translateError(error.message), rawMessage: error.message, releaseUrl: RELEASE_URL })
     }
     return { type: 'error', message: error.message }
   }
@@ -127,7 +142,7 @@ ipcMain.handle('update:download', async () => {
     await autoUpdater.downloadUpdate()
   } catch (error) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: error.message })
+      mainWindow.webContents.send('update-state', { type: 'error', message: translateError(error.message), rawMessage: error.message, releaseUrl: RELEASE_URL })
     }
   }
 })

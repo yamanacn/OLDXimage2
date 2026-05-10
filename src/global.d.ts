@@ -8,6 +8,8 @@ interface ElectronAPI {
     percent?: number
     speed?: number
     message?: string
+    rawMessage?: string
+    releaseUrl?: string
   }) => void) => () => void
   checkUpdate?: () => Promise<{ type: string; message?: string }>
   downloadUpdate?: () => Promise<void>

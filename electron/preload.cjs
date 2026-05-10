@@ -2,7 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateState: (callback) => {
-    ipcRenderer.on('update-state', (_event, data) => callback(data))
+    const handler = (_event, data) => callback(data)
+    ipcRenderer.removeAllListeners('update-state')
+    ipcRenderer.on('update-state', handler)
+    return () => ipcRenderer.removeListener('update-state', handler)
   },
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),

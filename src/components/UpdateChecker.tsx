@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, Download, RefreshCw, X, AlertCircle } from 'lucide-react'
+import { CheckCircle, Download, RefreshCw, X, AlertCircle, ExternalLink } from 'lucide-react'
 
 type UpdateState =
   | { type: 'idle' }
@@ -10,13 +10,13 @@ type UpdateState =
   | { type: 'available'; version: string; releaseNotes: string }
   | { type: 'downloading'; percent: number; speed: number }
   | { type: 'downloaded' }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; rawMessage?: string; releaseUrl?: string }
 
 const SKIPPED_VERSIONS_KEY = 'image2-skipped-versions'
 
 const getSkippedVersions = (): string[] => {
   try {
-    return JSON.parse(window.sessionStorage.getItem(SKIPPED_VERSIONS_KEY) || '[]')
+    return JSON.parse(window.localStorage.getItem(SKIPPED_VERSIONS_KEY) || '[]')
   } catch { return [] }
 }
 
@@ -24,7 +24,7 @@ const addSkippedVersion = (version: string) => {
   const skipped = getSkippedVersions()
   if (!skipped.includes(version)) {
     skipped.push(version)
-    window.sessionStorage.setItem(SKIPPED_VERSIONS_KEY, JSON.stringify(skipped))
+    window.localStorage.setItem(SKIPPED_VERSIONS_KEY, JSON.stringify(skipped))
   }
 }
 
@@ -32,11 +32,14 @@ const isSkipped = (version: string) => getSkippedVersions().includes(version)
 
 const easeOut = [0.23, 1, 0.32, 1] as const
 
+const RELEASE_URL = 'https://github.com/yamanacn/OLDXimage2/releases/latest'
+
 type Props = { collapsed?: boolean }
 
 export default function UpdateChecker({ collapsed = false }: Props) {
   const [state, setState] = useState<UpdateState>({ type: 'idle' })
   const [badge, setBadge] = useState(false)
+  const [popupPos, setPopupPos] = useState<{ bottom: number; left: number }>({ bottom: 80, left: 8 })
   const timerRef = useRef<number>(0)
   const anchorRef = useRef<HTMLDivElement>(null)
   const api = window.electronAPI
@@ -44,6 +47,19 @@ export default function UpdateChecker({ collapsed = false }: Props) {
   const isDownloading = state.type === 'downloading'
   const isDownloaded = state.type === 'downloaded'
   const showProgress = isDownloading || isDownloaded
+
+  const updatePopupPos = useCallback(() => {
+    if (!anchorRef.current) return
+    const r = anchorRef.current.getBoundingClientRect()
+    setPopupPos({ bottom: window.innerHeight - r.top + 8, left: r.left })
+  }, [])
+
+  // Recalculate popup position on state change and resize
+  useLayoutEffect(() => {
+    updatePopupPos()
+    window.addEventListener('resize', updatePopupPos)
+    return () => window.removeEventListener('resize', updatePopupPos)
+  }, [state.type, updatePopupPos])
 
   useEffect(() => {
     if (!api?.onUpdateState) return
@@ -63,9 +79,9 @@ export default function UpdateChecker({ collapsed = false }: Props) {
         window.clearTimeout(timerRef.current)
         timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 3000)
       } else if (data.type === 'error') {
-        setState({ type: 'error', message: data.message || '未知错误' })
+        setState({ type: 'error', message: data.message || '未知错误', rawMessage: data.rawMessage, releaseUrl: data.releaseUrl || RELEASE_URL })
         window.clearTimeout(timerRef.current)
-        timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 4000)
+        timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 6000)
       }
     })
   }, [api])
@@ -82,15 +98,15 @@ export default function UpdateChecker({ collapsed = false }: Props) {
     setState({ type: 'checking' })
     api.checkUpdate().then((result) => {
       if (result?.type === 'error') {
-        setState({ type: 'error', message: result.message || '更新检查不可用' })
+        setState({ type: 'error', message: '更新检查不可用', releaseUrl: RELEASE_URL })
         window.clearTimeout(timerRef.current)
-        timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 4000)
+        timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 6000)
       }
     })
     window.clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(() => {
-      setState((prev) => (prev.type === 'checking' ? { type: 'error', message: '检查超时，请稍后重试' } : prev))
-      timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 4000)
+      setState((prev) => (prev.type === 'checking' ? { type: 'error', message: '检查超时，请确保已开启网络代理', releaseUrl: RELEASE_URL } : prev))
+      timerRef.current = window.setTimeout(() => setState({ type: 'idle' }), 6000)
     }, 15000)
   }, [api, state.type, isDownloading])
 
@@ -109,15 +125,16 @@ export default function UpdateChecker({ collapsed = false }: Props) {
     setBadge(false)
   }, [state])
 
-  /* ── icon button (used when collapsed OR no download in progress in expanded) ── */
+  /* ── icon button ── */
   const iconEl = (
     <motion.button
       type="button"
       onClick={handleCheck}
       title="检查更新"
       aria-label="检查更新"
-      className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg text-neutral-600 transition hover:bg-white/[0.06] hover:text-neutral-300"
+      className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg text-neutral-600 transition hover:bg-white/[0.06] hover:text-neutral-300 disabled:pointer-events-none"
       whileTap={{ scale: 0.9 }}
+      disabled={state.type === 'checking'}
     >
       <AnimatePresence mode="wait">
         {state.type === 'checking' ? (
@@ -129,7 +146,7 @@ export default function UpdateChecker({ collapsed = false }: Props) {
             <CheckCircle size={16} className="text-emerald-400" />
           </motion.span>
         ) : state.type === 'error' ? (
-          <motion.span key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} title={`${state.message}，请确保已开启网络代理`}>
+          <motion.span key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} title={state.rawMessage || state.message}>
             <AlertCircle size={16} className="text-red-400" />
           </motion.span>
         ) : isDownloading || isDownloaded ? (
@@ -160,10 +177,9 @@ export default function UpdateChecker({ collapsed = false }: Props) {
       transition={{ duration: 0.25, ease: easeOut }}
       onClick={isDownloaded ? handleInstall : undefined}
       className={collapsed
-        ? "relative h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-full bg-white/8"
-        : "relative h-7 w-full shrink-0 cursor-pointer overflow-hidden rounded-full bg-white/8"}
+        ? `relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-white/8 ${isDownloaded ? 'cursor-pointer' : 'cursor-wait'}`
+        : `relative h-7 w-full shrink-0 overflow-hidden rounded-full bg-white/8 ${isDownloaded ? 'cursor-pointer' : 'cursor-wait'}`}
     >
-      {/* fill */}
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full"
         initial={false}
@@ -173,8 +189,6 @@ export default function UpdateChecker({ collapsed = false }: Props) {
         }}
         transition={{ width: { duration: 0.35, ease: 'easeOut' }, backgroundColor: { duration: 0.4 } }}
       />
-
-      {/* shimmer (downloading only) */}
       {isDownloading && (
         <motion.div
           className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/15 to-transparent"
@@ -184,8 +198,6 @@ export default function UpdateChecker({ collapsed = false }: Props) {
           transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
         />
       )}
-
-      {/* text */}
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="text-[11px] font-medium tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
           {isDownloaded
@@ -196,7 +208,7 @@ export default function UpdateChecker({ collapsed = false }: Props) {
     </motion.div>
   )
 
-  /* ── collapsed layout: icon only, swap to capsule on download ── */
+  /* ── collapsed layout ── */
   if (collapsed) {
     return (
       <div className="relative">
@@ -208,12 +220,7 @@ export default function UpdateChecker({ collapsed = false }: Props) {
   }
 
   /* ── expanded layout ── */
-  const popupStyle = anchorRef.current
-    ? (() => {
-        const r = anchorRef.current.getBoundingClientRect()
-        return { position: 'fixed' as const, bottom: window.innerHeight - r.top + 8, left: r.left, width: 280 }
-      })()
-    : { position: 'fixed' as const, bottom: 80, left: 8, width: 280 }
+  const popupStyle = { position: 'fixed' as const, ...popupPos, width: 280 }
 
   const popupCard = (
     <AnimatePresence>
@@ -287,6 +294,41 @@ export default function UpdateChecker({ collapsed = false }: Props) {
             >
               跳过
             </button>
+          </div>
+        </motion.div>
+      )}
+
+      {state.type === 'error' && (
+        <motion.div
+          style={popupStyle}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: easeOut }}
+          className="z-[10000] overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1a]/96 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.56)] backdrop-blur-xl"
+        >
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-red-300">
+            <AlertCircle size={15} />
+            {state.message}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCheck}
+              className="flex h-8 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-neutral-400 transition hover:border-white/20 hover:text-neutral-200"
+            >
+              重试
+            </button>
+            {state.releaseUrl && (
+              <button
+                type="button"
+                onClick={() => window.open(state.releaseUrl, '_blank')}
+                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white text-xs font-medium text-black transition hover:bg-neutral-200"
+              >
+                <ExternalLink size={13} />
+                手动下载
+              </button>
+            )}
           </div>
         </motion.div>
       )}
