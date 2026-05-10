@@ -152,7 +152,7 @@ export default function PromptEditor({
     const selection = window.getSelection()
 
     // 优先使用当前 selection，如果无效则尝试 savedRange
-    let range: Range | null = null
+    let range: Range | null | undefined = null
     if (selection && selection.rangeCount > 0) {
       const currentRange = selection.getRangeAt(0)
       if (root.contains(currentRange.commonAncestorContainer)) {
