@@ -8,7 +8,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-state', handler)
   },
   checkUpdate: () => ipcRenderer.invoke('update:check'),
-  downloadUpdate: () => ipcRenderer.invoke('update:download'),
-  installUpdate: () => ipcRenderer.invoke('update:install'),
   getAppVersion: () => ipcRenderer.sendSync('get-app-version') || '0.0.0',
 })

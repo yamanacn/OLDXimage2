@@ -81,22 +81,6 @@ if (!isDev) {
       }
     })
 
-    autoUpdater.on('download-progress', (progress) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-state', {
-          type: 'progress',
-          percent: Math.round(progress.percent),
-          speed: Math.round(progress.bytesPerSecond / 1024),
-        })
-      }
-    })
-
-    autoUpdater.on('update-downloaded', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-state', { type: 'downloaded' })
-      }
-    })
-
     autoUpdater.on('error', (error) => {
       console.error('[updater]', error.message)
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -121,7 +105,7 @@ ipcMain.on('get-app-version', (event) => {
 ipcMain.handle('update:check', async () => {
   if (!autoUpdater) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: '当前为开发模式，不支持自动更新', releaseUrl: RELEASE_URL })
+      mainWindow.webContents.send('update-state', { type: 'error', message: '当前为开发模式，不支持自动更新' })
     }
     return { type: 'error', message: 'Updater not available' }
   }
@@ -130,25 +114,10 @@ ipcMain.handle('update:check', async () => {
     return { type: 'checking' }
   } catch (error) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: translateError(error.message), rawMessage: error.message, releaseUrl: RELEASE_URL })
+      mainWindow.webContents.send('update-state', { type: 'error', message: translateError(error.message), rawMessage: error.message })
     }
     return { type: 'error', message: error.message }
   }
-})
-
-ipcMain.handle('update:download', async () => {
-  if (!autoUpdater) return
-  try {
-    await autoUpdater.downloadUpdate()
-  } catch (error) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-state', { type: 'error', message: translateError(error.message), rawMessage: error.message, releaseUrl: RELEASE_URL })
-    }
-  }
-})
-
-ipcMain.handle('update:install', () => {
-  if (autoUpdater) autoUpdater.quitAndInstall(false, true)
 })
 
 const resolveServerEntry = () => {
