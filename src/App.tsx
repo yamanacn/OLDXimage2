@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AppLayout from './components/AppLayout'
 import ControlPanel from './components/ControlPanel'
 import BilibiliIcon from './components/BilibiliIcon'
 import Feed from './components/Feed'
@@ -623,11 +624,12 @@ export default function App() {
   }
 
   return (
-    <div
-      className="relative h-screen overflow-hidden bg-[var(--color-dark-bg)] text-white font-sans antialiased"
-      style={{ '--right-panel-width': `${panelWidth}px` } as React.CSSProperties}
-    >
-      <header className="relative z-10 flex h-14 items-center justify-between gap-4 border-b border-[var(--color-dark-border)] bg-[#0a0a0a]/95 px-5 backdrop-blur max-[520px]:px-4">
+    <AppLayout>
+      <div
+        className="relative h-screen overflow-hidden bg-[var(--color-dark-bg)] text-white font-sans antialiased"
+        style={{ '--right-panel-width': `${panelWidth}px` } as React.CSSProperties}
+      >
+        <header data-layout="header" className="relative z-10 flex h-14 items-center justify-between gap-4 border-b border-[var(--color-dark-border)] bg-[#0a0a0a]/95 px-5 backdrop-blur max-[520px]:px-4">
         <div className="relative flex min-w-0 items-center gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <img src="/logo.ico" alt="" className="h-9 w-10 shrink-0 rounded-xl object-cover" aria-hidden="true" />
@@ -760,6 +762,7 @@ export default function App() {
 
       <div className="relative z-10 flex h-[calc(100vh-56px)] overflow-hidden max-[760px]:flex-col">
         <Sidebar
+          data-layout="sidebar"
           activeView={activeView}
           onViewChange={setActiveView}
           collapsed={sidebarCollapsed}
@@ -781,6 +784,7 @@ export default function App() {
 
         {/* 主工作区 */}
         <motion.div
+          data-layout="workspace"
           layout
           transition={{ duration: 0.22, ease: 'easeOut' }}
           className="flex-1 min-w-0 h-full overflow-y-auto relative border-r border-[var(--color-dark-border)] max-[760px]:h-[45vh] max-[760px]:border-r-0 max-[760px]:border-b"
@@ -812,6 +816,7 @@ export default function App() {
 
         {/* 右侧控制台 */}
         <motion.div
+          data-layout="panel"
           initial={false}
           animate={{
             width: isPromptReferenceView ? 0 : panelWidth,
@@ -844,5 +849,6 @@ export default function App() {
         )}
       </div>
     </div>
+    </AppLayout>
   )
 }
