@@ -126,12 +126,6 @@ const dataUrlToBlob = (image: ReferenceImagePayload) => {
 }
 
 const appendImageFiles = async (form: FormData, images: ReferenceImagePayload[]) => {
-  if (images.length === 0) {
-    const blank = await fetch(FALLBACK_PNG_DATA_URL).then(response => response.blob())
-    form.append('image', blank, 'blank.png')
-    return
-  }
-
   for (const [index, image] of images.entries()) {
     const blob = dataUrlToBlob(image)
     form.append('image', blob, image.name || `image_${index}.png`)
