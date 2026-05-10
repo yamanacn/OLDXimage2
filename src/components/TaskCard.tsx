@@ -627,13 +627,44 @@ export default function TaskCard({
           onClick={() => setPreviewImage(null)}
         >
           <div className="relative max-h-full max-w-6xl" onClick={event => event.stopPropagation()}>
-            <img src={previewImage.url} alt="Preview" className="max-h-[86vh] max-w-full rounded-2xl border border-white/10 object-contain" />
+            <ContextMenu
+              items={[
+                {
+                  label: '复制图片',
+                  icon: <Copy size={15} />,
+                  onClick: () => void copyImageToClipboard(previewImage.url).catch(() => {}),
+                },
+                {
+                  label: '打开所在文件夹',
+                  icon: <FolderOpen size={15} />,
+                  onClick: () => void revealFile(previewImage.url).catch(() => {}),
+                },
+                ...(previewImage.type === 'result' && onUseAsReference ? [{
+                  label: '添加到参考图',
+                  icon: <Plus size={15} />,
+                  onClick: () => {
+                    handleUsePreviewAsReference()
+                    setPreviewImage(null)
+                  },
+                }] : []),
+              ]}
+            >
+              {({ onContextMenu }) => (
+                <img
+                  src={previewImage.url}
+                  alt="Preview"
+                  className="max-h-[86vh] max-w-full cursor-context-menu rounded-2xl border border-white/10 object-contain"
+                  onContextMenu={onContextMenu}
+                />
+              )}
+            </ContextMenu>
             <div className="absolute right-3 top-3 flex items-center gap-2">
               {previewImage.type === 'result' && onUseAsReference && (
                 <AddToReferenceButton
                   onClick={(event) => {
                     event.stopPropagation()
                     handleUsePreviewAsReference()
+                    setPreviewImage(null)
                   }}
                   className="opacity-100"
                 />
@@ -650,7 +681,10 @@ export default function TaskCard({
             {previewImage.type === 'result' && (
               <button
                 type="button"
-                onClick={() => void revealFile(previewImage.url).catch(() => {})}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void revealFile(previewImage.url).catch(() => {})
+                }}
                 className="absolute bottom-3 right-3 flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 text-sm text-white transition hover:bg-white/15"
               >
                 <FolderOpen size={16} />

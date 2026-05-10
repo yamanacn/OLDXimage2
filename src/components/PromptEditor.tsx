@@ -150,7 +150,19 @@ export default function PromptEditor({
 
     root.focus()
     const selection = window.getSelection()
-    let range = savedRangeRef.current?.cloneRange()
+
+    // 优先使用当前 selection，如果无效则尝试 savedRange
+    let range: Range | null = null
+    if (selection && selection.rangeCount > 0) {
+      const currentRange = selection.getRangeAt(0)
+      if (root.contains(currentRange.commonAncestorContainer)) {
+        range = currentRange.cloneRange()
+      }
+    }
+
+    if (!range) {
+      range = savedRangeRef.current?.cloneRange()
+    }
 
     if (!range || !root.contains(range.commonAncestorContainer)) {
       range = document.createRange()
@@ -238,9 +250,14 @@ export default function PromptEditor({
         insertReference(images[activeIndex])
         return
       }
+      // 菜单打开时，阻止其他可打印字符的默认行为
+      if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault()
+        return
+      }
     }
 
-    if (event.key === '@') {
+    if (event.key === '@' && !event.nativeEvent.isComposing) {
       event.preventDefault()
       openMentionMenu()
     }
